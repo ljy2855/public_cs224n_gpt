@@ -1,3 +1,4 @@
+from einops import rearrange
 from torch import nn
 
 import torch.nn.functional as F
@@ -30,9 +31,11 @@ class GPT2Layer(nn.Module):
         IN THIS FUNCTION.
     """
     ### YOUR CODE HERE
-    raise NotImplementedError
-
-
+    transformed = dense_layer(output)
+    dropped = dropout(transformed)
+    
+    return input + dropped
+  
   def forward(self, hidden_states, attention_mask):
     """
     TODO: Implement the forward pass. Some key points to consider:
@@ -43,5 +46,18 @@ class GPT2Layer(nn.Module):
     """
 
     ### YOUR CODE HERE
-    raise NotImplementedError
+    # 1. Layer Normalization & Multi-head Self-Attention
+    norm_hidden_states = self.attention_layer_norm(hidden_states)
+    attention_output = self.self_attention(norm_hidden_states, attention_mask)
+    attention_output = self.add(hidden_states, attention_output, self.attention_dense, self.attention_dropout)
 
+    # 2. Layer Normalization & Feed Forward Network
+    norm_attention_output = self.out_layer_norm(attention_output)
+    interm_states = self.interm_dense(norm_attention_output)  # First linear layer
+    interm_states = self.interm_af(interm_states)  # Activation function (GELU)
+
+    # Residual Connection for Feed Forward
+    final_output = self.add(attention_output, interm_states, self.out_dense, self.out_dropout)
+
+    # 3. 최종 출력 반환
+    return final_output
