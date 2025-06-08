@@ -1,298 +1,115 @@
-
-\documentclass{article} % For LaTeX2e
-\usepackage{colm2024_conference}
-
+\documentclass{article}
 \usepackage{microtype}
 \usepackage{hyperref}
 \usepackage{url}
 \usepackage{booktabs}
-\definecolor{darkblue}{rgb}{0, 0, 0.5}
-\hypersetup{colorlinks=true, citecolor=darkblue, linkcolor=darkblue, urlcolor=darkblue}
+\usepackage{xcolor}
 
+\title{Fine-tuning GPT-2 for Sentiment Analysis, Paraphrase Detection, Sonnet Generation, and Short Query Intent Classification}
 
-\title{Formatting Instructions for COLM 2024 \\ Conference Submissions}
+\author{Anonymous Authors}
 
-% Authors must not appear in the submitted version. They should be hidden
-% as long as the \colmfinalcopy macro remains commented out below.
-% Non-anonymous submissions will be rejected without review.
-
-\author{Antiquus S.~Hippocampus, Natalia Cerebro \& Amelie P. Amygdale \thanks{ Use footnote for providing further information
-about author (webpage, alternative address)---\emph{not} for acknowledging
-funding agencies.  Funding acknowledgements go at the end of the paper.} \\
-Department of Computer Science\\
-Cranberry-Lemon University\\
-Pittsburgh, PA 15213, USA \\
-\texttt{\{hippo,brain,jen\}@cs.cranberry-lemon.edu} \\
-\And
-Ji Q. Ren \& Yevgeny LeNet \\
-Department of Computational Neuroscience \\
-University of the Witwatersrand \\
-Joburg, South Africa \\
-\texttt{\{robot,net\}@wits.ac.za} \\
-\AND
-Coauthor \\
-Affiliation \\
-Address \\
-\texttt{email}
-}
-
-% The \author macro works with any number of authors. There are two commands
-% used to separate the names and addresses of multiple authors: \And and \AND.
-%
-% Using \And between authors leaves it to \LaTeX{} to determine where to break
-% the lines. Using \AND forces a linebreak at that point. So, if \LaTeX{}
-% puts 3 of 4 authors names on the first line, and the last on the second
-% line, try using \AND instead of \And before the third author name.
-
-\newcommand{\fix}{\marginpar{FIX}}
-\newcommand{\new}{\marginpar{NEW}}
-
-% \colmfinalcopy % Uncomment for camera-ready version, but NOT for submission.
 \begin{document}
-
 
 \maketitle
 
 \begin{abstract}
-The abstract paragraph should be indented 1/2~inch (3~picas) on both left and
-right-hand margins. Use 10~point type, with a vertical spacing of 11~points.
-The word \textsc{Abstract} must be centered, in small caps, and in point size 12. Two
-line spaces precede the abstract. The abstract must be limited to one
-paragraph.
+This report presents our implementation and experimental analysis of a GPT-2-based language model, fine-tuned across four distinct natural language tasks: sentiment analysis, paraphrase detection, sonnet generation, and intent classification for short user queries. Our study aims to bridge generative pretraining with downstream task-specific performance. We report baseline results, identify model limitations, and explore cloze-style formulation for classification and creative generation via autoregressive decoding.
 \end{abstract}
 
-\section{Submission of conference papers to COLM 2024}
+\section{Introduction}
+Recent advancements in natural language processing (NLP) demonstrate the effectiveness of transformer-based architectures. GPT-2, a decoder-only model, exhibits strong capabilities in both language understanding and generation. This project involves implementing core GPT-2 components, fine-tuning for classification and generation, and evaluating the model's performance across multiple tasks.
 
-COLM requires electronic submissions, processed by
-\url{https://openreview.net/}. See COLM's website for more instructions.
+\section{Task Descriptions}
+\subsection{Sentiment Analysis}
+We fine-tune GPT-2 on two datasets: Stanford Sentiment Treebank (SST) and CFIMDB. For SST, a 5-class classification task, we utilize phrase-level sentiment annotations. For CFIMDB, we address binary sentiment classification on long movie reviews.
 
-If your paper is ultimately accepted, the statement {\tt
-  {\textbackslash}colmfinalcopy} should be inserted to adjust the
-format to the camera ready requirements.
+\subsection{Paraphrase Detection}
+The Quora Question Pairs dataset is used to determine semantic similarity between sentence pairs. We reformulate the classification task as cloze-style generation, prompting the model with a paraphrase question and expecting a ``yes'' or ``no'' response.
 
-The format for the submissions is a variant of the NeurIPS format.
-Please read carefully the instructions below, and follow them
-faithfully.
+\subsection{Sonnet Generation}
+We train the model to generate Shakespearian sonnets. The task involves predicting the next token given prior lines, preserving rhyme and structure inherent to sonnets.
 
-\subsection{Style}
+\subsection{Short Query Intent Classification}
+As an extension, we examine GPT-2's ability to classify user intent from short, ambiguous queries. Users often provide minimal input (e.g., ``Weather?'', ``Pizza nearby''), posing a challenge for traditional NLP models due to limited context. We fine-tune our GPT-2 model using the MASSIVE dataset (SetFit/amazon\_massive\_intent\_en-US), evaluating its intent classification performance across queries of varying lengths. We focus on short queries to test the hypothesis that GPT-2's deep contextual embeddings enable it to disambiguate intent even under severe information sparsity.
 
-Papers to be submitted to COLM 2024 must be prepared according to the
-instructions presented here.
+\section{Model Implementation}
+\subsection{GPT-2 Architecture}
+Our model is based on a 12-layer GPT-2 with masked multi-head attention and feed-forward layers. We implement key components:
+\begin{itemize}
+\item \texttt{CausalSelfAttention} for masked self-attention.
+\item \texttt{GPT2Layer} stacking attention and MLP blocks.
+\item \texttt{GPT2Model} combining token and positional embeddings.
+\end{itemize}
 
-%% Please note that we have introduced automatic line number generation
-%% into the style file for \LaTeXe. This is to help reviewers
-%% refer to specific lines of the paper when they make their comments. Please do
-%% NOT refer to these line numbers in your paper as they will be removed from the
-%% style file for the final version of accepted papers.
+\subsection{Implementation Details}
+The GPT-2 implementation consists of several key components:
 
-Authors are required to use the COLM \LaTeX{} style files obtainable at the
-COLM website. Please make sure you use the current files and
-not previous versions. Tweaking the style files may be grounds for rejection.
+\subsubsection{Embedding Layer}
+The model uses two types of embeddings:
+\begin{itemize}
+\item Word embeddings: Maps input tokens to dense vectors
+\item Position embeddings: Adds positional information to each token
+\end{itemize}
+These embeddings are combined and passed through a dropout layer.
 
-\subsection{Retrieval of style files}
+\subsubsection{GPT-2 Layer}
+Each GPT-2 layer contains:
+\begin{itemize}
+\item Multi-head self-attention with causal masking
+\item Layer normalization before attention and feed-forward
+\item Feed-forward network with GELU activation
+\item Residual connections around each sub-layer
+\end{itemize}
 
-The style files for COLM and other conference information are available online at:
-\begin{center}
-   \url{http://www.colmweb.org/}
-\end{center}
-The file \verb+colm2024_conference.pdf+ contains these
-instructions and illustrates the
-various formatting requirements your COLM paper must satisfy.
-Submissions must be made using \LaTeX{} and the style files
-\verb+colm2024_conference.sty+ and \verb+colm2024_conference.bst+ (to be used with \LaTeX{}2e). The file
-\verb+colm2024_conference.tex+ may be used as a ``shell'' for writing your paper. All you
-have to do is replace the author, title, abstract, and text of the paper with
-your own.
+\subsubsection{Model Architecture}
+The complete model:
+\begin{itemize}
+\item Processes input through embedding layers
+\item Passes through 12 transformer layers
+\item Applies final layer normalization
+\item Returns both sequence outputs and last token representation
+\end{itemize}
 
-The formatting instructions contained in these style files are summarized in
-sections \ref{gen_inst}, \ref{headings}, and \ref{others} below.
+\subsection{Training Setup}
+We use HuggingFace tokenizers and initialize with pre-trained weights. Optimization is performed using the Adam optimizer with bias correction and decoupled weight decay. Fine-tuning varies between last-layer tuning and full-model tuning.
 
-\section{General formatting instructions}
-\label{gen_inst}
+\section{Sentiment Classification Results}
+Using the classifier head on the last token's representation:
+\begin{itemize}
+\item SST last-layer dev accuracy: 46.2\%
+\item SST full-model dev accuracy: 51.3\%
+\item CFIMDB last-layer dev accuracy: 86.1\%
+\item CFIMDB full-model dev accuracy: 97.6\%
+\end{itemize}
+The significant improvement in full-model fine-tuning for CFIMDB suggests that the deeper context captured in longer sequences benefits from broader parameter updates.
 
-The text must be confined within a rectangle 5.5~inches (33~picas) wide and
-9~inches (54~picas) long. The left margin is 1.5~inch (9~picas).
-Use 10~point type with a vertical spacing of 11~points. Palatino is the
-preferred typeface throughout. Paragraphs are separated by 1/2~line space,
-with no indentation.
+\section{Paraphrase Detection via Cloze-Style Prompting}
+We construct cloze-formulated prompts like:
+\texttt{Is ``sentence A'' a paraphrase of ``sentence B''?}
 
-Paper title is 17~point, in small caps and left-aligned.
-All pages should start at 1~inch (6~picas) from the top of the page.
+We decode the next token and compare it with token ids for ``yes'' or ``no''. Performance is measured via accuracy on Quora's dev/test sets.
 
-Authors' names are
-set in boldface, and each name is placed above its corresponding
-address. The lead author's name is to be listed first, and
-the co-authors' names are set to follow. Authors sharing the
-same address can be on the same line.
+\subsection{Observations}
+Cloze formulation leverages GPT-2's autoregressive nature. Preliminary experiments show that decoder-only models can handle classification by token generation, although error rates arise from ambiguity or tokenization noise.
 
-Please pay special attention to the instructions in section \ref{others}
-regarding figures, tables, acknowledgments, and references.
+\section{Sonnet Generation}
+GPT-2 is fine-tuned on 143 sonnets and evaluated on 12 held-out examples, conditioned on their first three lines. Evaluation metric is CHRF.
 
+\subsection{Qualitative Analysis}
+Generated outputs often preserve meter and rhyme patterns. However, semantic coherence and novelty vary. Sample outputs demonstrate syntactic fluency, but shallow semantic depth.
 
-There will be a strict upper limit of 9 pages for the main text of the initial submission, with unlimited additional pages for citations. 
+\section{Short Query Intent Classification Results}
+We segment test samples from the MASSIVE dataset by length to compare performance on short versus long queries. The model shows promising F1-scores even on short utterances, though performance slightly declines as length decreases. Qualitative analysis reveals that ambiguity is more pronounced in imperative or single-word inputs.
 
-\section{Headings: first level}
-\label{headings}
+\section{Conclusion and Future Work}
+Our project validates GPT-2's flexibility across structured (classification) and unstructured (generation) tasks. The additional short-query intent classification task underscores GPT-2's ability to handle minimal context using deep pretraining. Future directions include parameter-efficient fine-tuning (LoRA), incorporating rhyme constraints in generation, and second-order optimization (e.g., Shampoo) for faster convergence.
 
-First level headings are in lower case (except for first word and proper nouns), bold face,
-flush left and in point size 12. One line space before the first level
-heading and 1/2~line space after the first level heading.
-
-\subsection{Headings: second level}
-
-Second level headings are in lower case (except for first word and proper nouns), bold face,
-flush left and in point size 10. One line space before the second level
-heading and 1/2~line space after the second level heading.
-
-\subsubsection{Headings: third level}
-
-Third level headings are in lower case (except for first word and proper nouns),
-flush left and in point size 10. One line space before the third level
-heading and 1/2~line space after the third level heading.
-
-\section{Citations, figures, tables, references}
-\label{others}
-
-These instructions apply to everyone, regardless of the formatter being used.
-
-\subsection{Citations within the text}
-
-Citations within the text should be based on the \texttt{natbib} package
-and include the authors' last names and year (with the ``et~al.'' construct
-for more than two authors). When the authors or the publication are
-included in the sentence, the citation should not be in parenthesis using \verb|\citet{}| (as
-in ``See \citet{Vaswani+2017} for more information.''). Otherwise, the citation
-should be in parenthesis using \verb|\citep{}| (as in ``Transformers are a key tool
-for developing language models~\citep{Vaswani+2017}.'').
-
-The corresponding references are to be listed in alphabetical order of
-authors, in the \textsc{References} section. As to the format of the
-references themselves, any style is acceptable as long as it is used
-consistently.
-
-\subsection{Footnotes}
-
-Indicate footnotes with a number\footnote{Sample of the first footnote} in the
-text. Place the footnotes at the bottom of the page on which they appear.
-Precede the footnote with a horizontal rule of 2~inches
-(12~picas).\footnote{Sample of the second footnote}
-
-\subsection{Figures}
-
-All artwork must be neat, clean, and legible. Lines should be dark
-enough for purposes of reproduction; art work should not be
-hand-drawn. The figure number and caption always appear after the
-figure. Place one line space before the figure caption, and one line
-space after the figure. The figure caption is lower case (except for
-first word and proper nouns); figures are numbered consecutively.
-
-Make sure the figure caption does not get separated from the figure.
-Leave sufficient space to avoid splitting the figure and figure caption.
-
-You may use color figures.
-However, it is best for the
-figure captions and the paper body to make sense if the paper is printed
-either in black/white or in color.
-\begin{figure}[h]
-\begin{center}
-%\framebox[4.0in]{$\;$}
-\fbox{\rule[-.5cm]{0cm}{4cm} \rule[-.5cm]{4cm}{0cm}}
-\end{center}
-\caption{Sample figure caption.}
-\end{figure}
-
-\subsection{Tables}
-
-All tables must be centered, neat, clean and legible. Do not use hand-drawn
-tables. The table number and title always appear before the table. See
-Table~\ref{sample-table}.
-
-Place one line space before the table title, one line space after the table
-title, and one line space after the table. The table title must be lower case
-(except for first word and proper nouns); tables are numbered consecutively.
-
-\begin{table}[t]
-
-\label{sample-table}
-\begin{center}
-\begin{tabular}{ll}
-\toprule
-\multicolumn{1}{c}{\bf PART}  &\multicolumn{1}{c}{\bf DESCRIPTION} \\
-\midrule
-Dendrite         &Input terminal \\
-Axon             &Output terminal \\
-Soma             &Cell body (contains cell nucleus) \\
-\bottomrule
-\end{tabular}
-\end{center}
-\caption{Sample table title}
-\end{table}
-
-
-\section{Final instructions}
-Do not change any aspects of the formatting parameters in the style files.
-In particular, do not modify the width or length of the rectangle the text
-should fit into, and do not change font sizes (except perhaps in the
-\textsc{References} section; see below). Please note that pages should be
-numbered.
-
-\section{Preparing PostScript or PDF files}
-
-Please prepare PostScript or PDF files with paper size ``US Letter'', and
-not, for example, ``A4''. The -t
-letter option on dvips will produce US Letter files.
-
-Consider directly generating PDF files using \verb+pdflatex+
-(especially if you are a MiKTeX user).
-PDF figures must be substituted for EPS figures, however.
-
-Otherwise, please generate your PostScript and PDF files with the following commands:
-\begin{verbatim}
-dvips mypaper.dvi -t letter -Ppdf -G0 -o mypaper.ps
-ps2pdf mypaper.ps mypaper.pdf
-\end{verbatim}
-
-\subsection{Margins in LaTeX}
-
-Most of the margin problems come from figures positioned by hand using
-\verb+\special+ or other commands. We suggest using the command
-\verb+\includegraphics+
-from the graphicx package. Always specify the figure width as a multiple of
-the line width as in the example below using .eps graphics
-\begin{verbatim}
-   \usepackage[dvips]{graphicx} ...
-   \includegraphics[width=0.8\linewidth]{myfile.eps}
-\end{verbatim}
-or % Apr 2009 addition
-\begin{verbatim}
-   \usepackage[pdftex]{graphicx} ...
-   \includegraphics[width=0.8\linewidth]{myfile.pdf}
-\end{verbatim}
-for .pdf graphics.
-See section~4.4 in the graphics bundle documentation (\url{http://www.ctan.org/tex-archive/macros/latex/required/graphics/grfguide.ps})
-
-A number of width problems arise when LaTeX cannot properly hyphenate a
-line. Please give LaTeX hyphenation hints using the \verb+\-+ command.
-
-\subsubsection*{Author Contributions}
-If you'd like to, you may include  a section for author contributions as is done
-in many journals. This is optional and at the discretion of the authors.
-
-\subsubsection*{Acknowledgments}
-Use unnumbered third level headings for the acknowledgments. All
-acknowledgments, including those to funding agencies, go at the end of the paper.
-
-\section{Ethics Statement}
-Authors can add an optional ethics statement to the paper. 
-For papers that touch on ethical issues, this section will be evaluated as part of the review process. The ethics statement should come at the end of the paper. It does not count toward the page limit, but should not be more than 1 page. 
-
-
-
-\bibliography{colm2024_conference}
-\bibliographystyle{colm2024_conference}
+\section*{Acknowledgments}
+We thank the CS224N staff for providing the starter code and detailed documentation.
 
 \appendix
-\section{Appendix}
-You may include other additional sections here.
+\section{Appendix: Implementation Details}
+Sanity checks passed for attention and optimizer modules. All experiments conducted on a single NVIDIA A100 GPU. Hyperparameters: learning rate $1\mathrm{e}{-4}$, batch size 16, epochs 5--10. For intent classification, we used standard accuracy and F1 metrics segmented by query length.
 
 \end{document}
