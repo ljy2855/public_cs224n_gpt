@@ -69,11 +69,10 @@ class ParaphraseGPT(nn.Module):
     token "yes" (byte pair encoding index of 8505) for examples that are paraphrases or "no" (byte pair encoding index
      of 3919) for examples that are not paraphrases.
     """
-
-    'Takes a batch of sentences and produces embeddings for them.'
-    ### YOUR CODE HERE
-    raise NotImplementedError
-
+    outputs = self.gpt(input_ids, attention_mask)
+    last_token_hidden = outputs['last_token']
+    logits = self.paraphrase_detection_head(last_token_hidden)
+    return logits
 
 
 def save_model(model, optimizer, args, filepath):
