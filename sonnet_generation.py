@@ -20,7 +20,7 @@ from tqdm import tqdm
 from transformers import GPT2Tokenizer
 from einops import rearrange
 
-from datasets import (
+from data_loader import (
   SonnetsDataset,
 )
 from models.gpt2 import GPT2Model

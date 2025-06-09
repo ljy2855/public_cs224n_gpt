@@ -15,6 +15,8 @@ from torch.utils.data import Dataset
 from transformers import GPT2Tokenizer
 
 
+from datasets import load_dataset
+
 def preprocess_string(s):
   return ' '.join(s.lower()
                   .replace('.', ' .')
@@ -160,3 +162,92 @@ class SonnetsDataset(Dataset):
     }
 
     return batched_data
+
+class IntentClassificationDataset(Dataset):
+  def __init__(self, dataset, args):
+    self.dataset = dataset
+    self.p = args
+    self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+    self.tokenizer.pad_token = self.tokenizer.eos_token
+
+  def __len__(self):
+    return len(self.dataset)
+
+  def __getitem__(self, idx):
+    return self.dataset[idx]
+
+  def collate_fn(self, all_data):
+    texts = [x[0] for x in all_data]
+    labels = torch.LongTensor([x[1] for x in all_data])
+    sent_ids = [x[2] for x in all_data]
+
+    encoding = self.tokenizer(texts, return_tensors='pt', padding=True, truncation=True)
+
+    token_ids = torch.LongTensor(encoding['input_ids'])
+    attention_mask = torch.LongTensor(encoding['attention_mask'])
+
+    batched_data = {
+      'token_ids': token_ids,
+      'attention_mask': attention_mask,
+      'labels': labels,
+      'sent_ids': sent_ids
+    }
+
+    return batched_data
+
+class IntentClassificationTestDataset(Dataset):
+  def __init__(self, dataset, args):
+    self.dataset = dataset
+    self.p = args
+    self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+    self.tokenizer.pad_token = self.tokenizer.eos_token
+
+  def __len__(self):
+    return len(self.dataset)
+
+  def __getitem__(self, idx):
+    return self.dataset[idx]
+
+  def collate_fn(self, all_data):
+    texts = [x[0] for x in all_data]
+    sent_ids = [x[2] for x in all_data]
+
+    encoding = self.tokenizer(texts, return_tensors='pt', padding=True, truncation=True)
+
+    token_ids = torch.LongTensor(encoding['input_ids'])
+    attention_mask = torch.LongTensor(encoding['attention_mask'])
+
+    batched_data = {
+      'token_ids': token_ids,
+      'attention_mask': attention_mask,
+      'sent_ids': sent_ids
+    }
+
+    return batched_data
+
+def load_intent_classification_data(dataset_name="SetFit/amazon_massive_intent_en-US", split='train'):
+  dataset = load_dataset(dataset_name, split=split)
+  intent_data = []
+  
+  for record in dataset:
+    text = record['text']
+    label = record['label']
+    sent_id = record['id'] if 'id' in record else str(len(intent_data))  # Use index as ID if not present
+    intent_data.append((text, label, sent_id))
+  
+  print(f"Loaded {len(intent_data)} {split} examples from {dataset_name}")
+  return intent_data
+
+
+if __name__ == "__main__":
+  # Example usage
+  dataset = load_intent_classification_data()
+  intent_dataset = IntentClassificationDataset(dataset, None)
+  print(f"Number of samples in the dataset: {len(intent_dataset)}")
+  print(intent_dataset[0])  # Print the first sample
+  batched_data = intent_dataset.collate_fn(intent_dataset[:5])
+  print(batched_data['token_ids'].shape)  # Print the shape of token IDs in the batch
+  print(batched_data['attention_mask'].shape)  # Print the shape of attention mask in the batch
+  print(batched_data['labels'])  # Print the labels in the batch
+  print(batched_data['sent_ids'])  # Print the sentence IDs in the batch
+  # Example for paraphrase detection dataset
