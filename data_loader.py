@@ -190,7 +190,8 @@ class IntentClassificationDataset(Dataset):
       'token_ids': token_ids,
       'attention_mask': attention_mask,
       'labels': labels,
-      'sent_ids': sent_ids
+      'sent_ids': sent_ids,
+      'texts': texts
     }
 
     return batched_data
@@ -220,7 +221,8 @@ class IntentClassificationTestDataset(Dataset):
     batched_data = {
       'token_ids': token_ids,
       'attention_mask': attention_mask,
-      'sent_ids': sent_ids
+      'sent_ids': sent_ids,
+      'texts': texts
     }
 
     return batched_data
