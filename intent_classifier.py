@@ -43,16 +43,21 @@ class MetricsTracker:
             print(f"Warning: Could not create metrics directory: {e}")
         self.metrics = {
             'train_loss': [],
+            'dev_loss': [],
             'train_acc': [],
             'train_f1': [],
             'dev_acc': [],
             'dev_f1': [],
             'train_f1_weighted': [],
-            'dev_f1_weighted': []
+            'dev_f1_weighted': [],
+            'test_acc': None,
+            'test_f1': None,
+            'test_f1_weighted': None
         }
     
-    def update(self, epoch, train_loss, train_acc, train_f1, dev_acc, dev_f1, train_f1_weighted, dev_f1_weighted):
+    def update(self, epoch, train_loss, train_acc, train_f1, dev_acc, dev_f1, train_f1_weighted, dev_f1_weighted, dev_loss):
         self.metrics['train_loss'].append(train_loss)
+        self.metrics['dev_loss'].append(dev_loss)
         self.metrics['train_acc'].append(train_acc)
         self.metrics['train_f1'].append(train_f1)
         self.metrics['dev_acc'].append(dev_acc)
@@ -74,38 +79,51 @@ class MetricsTracker:
             print(f"Warning: Could not plot metrics: {e}")
     
     def plot_metrics(self):
-        plt.figure(figsize=(15, 10))
-        
         # Create x-axis values (epoch numbers)
         epochs = list(range(len(self.metrics['train_loss'])))
         
-        # Plot training loss
-        plt.subplot(2, 1, 1)
+        # Plot training and dev loss
+        plt.figure(figsize=(10, 6))
         plt.plot(epochs, self.metrics['train_loss'], label='Training Loss')
-        plt.title('Training Loss over Epochs')
+        plt.plot(epochs, self.metrics['dev_loss'], label='Dev Loss')
+        plt.title('Training and Dev Loss over Epochs')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.legend()
         plt.grid(True)
         plt.xticks(epochs)  # Show all epoch numbers
+        plt.tight_layout()
+        plt.savefig(self.save_dir / 'loss_metrics.png')
+        plt.close()
         
-        # Plot accuracy and F1
-        plt.subplot(2, 1, 2)
+        # Plot accuracy
+        plt.figure(figsize=(10, 6))
         plt.plot(epochs, self.metrics['train_acc'], label='Train Accuracy')
-        plt.plot(epochs, self.metrics['train_f1'], label='Train F1 (Macro)')
         plt.plot(epochs, self.metrics['dev_acc'], label='Dev Accuracy')
-        plt.plot(epochs, self.metrics['dev_f1'], label='Dev F1 (Macro)')
-        plt.plot(epochs, self.metrics['train_f1_weighted'], label='Train Weighted F1')
-        plt.plot(epochs, self.metrics['dev_f1_weighted'], label='Dev Weighted F1')
-        plt.title('Accuracy and F1 Score over Epochs')
+        plt.title('Accuracy over Epochs')
         plt.xlabel('Epoch')
-        plt.ylabel('Score')
+        plt.ylabel('Accuracy')
         plt.legend()
         plt.grid(True)
         plt.xticks(epochs)  # Show all epoch numbers
-        
         plt.tight_layout()
-        plt.savefig(self.save_dir / 'metrics.png')
+        plt.savefig(self.save_dir / 'accuracy_metrics.png')
+        plt.close()
+        
+        # Plot F1 scores
+        plt.figure(figsize=(10, 6))
+        plt.plot(epochs, self.metrics['train_f1'], label='Train F1 (Macro)')
+        plt.plot(epochs, self.metrics['train_f1_weighted'], label='Train F1 (Weighted)')
+        plt.plot(epochs, self.metrics['dev_f1'], label='Dev F1 (Macro)')
+        plt.plot(epochs, self.metrics['dev_f1_weighted'], label='Dev F1 (Weighted)')
+        plt.title('F1 Scores over Epochs')
+        plt.xlabel('Epoch')
+        plt.ylabel('F1 Score')
+        plt.legend()
+        plt.grid(True)
+        plt.xticks(epochs)  # Show all epoch numbers
+        plt.tight_layout()
+        plt.savefig(self.save_dir / 'f1_metrics.png')
         plt.close()
 
 class GPT2IntentClassifier(torch.nn.Module):
@@ -145,28 +163,38 @@ def model_eval(dataloader, model, device):
     y_pred = []
     texts = []
     sent_ids = []
-    for step, batch in enumerate(tqdm(dataloader, desc=f'eval', disable=TQDM_DISABLE)):
-        b_ids, b_mask, b_labels, b_texts, b_sent_ids = batch['token_ids'], batch['attention_mask'], \
-                                                      batch['labels'], batch['texts'], batch['sent_ids']
+    total_loss = 0
+    num_batches = 0
+    
+    with torch.no_grad():
+        for step, batch in enumerate(tqdm(dataloader, desc=f'eval', disable=TQDM_DISABLE)):
+            b_ids, b_mask, b_labels, b_texts, b_sent_ids = batch['token_ids'], batch['attention_mask'], \
+                                                          batch['labels'], batch['texts'], batch['sent_ids']
 
-        b_ids = b_ids.to(device)
-        b_mask = b_mask.to(device)
+            b_ids = b_ids.to(device)
+            b_mask = b_mask.to(device)
+            b_labels = b_labels.to(device)
 
-        logits = model(b_ids, b_mask)
-        logits = logits.detach().cpu().numpy()
-        preds = np.argmax(logits, axis=1).flatten()
+            logits = model(b_ids, b_mask)
+            loss = F.cross_entropy(logits, b_labels.view(-1), reduction='sum') / b_ids.size(0)
+            total_loss += loss.item()
+            num_batches += 1
+            
+            logits = logits.detach().cpu().numpy()
+            preds = np.argmax(logits, axis=1).flatten()
 
-        b_labels = b_labels.flatten()
-        y_true.extend(b_labels)
-        y_pred.extend(preds)
-        texts.extend(b_texts)
-        sent_ids.extend(b_sent_ids)
+            b_labels = b_labels.cpu().numpy().flatten()  # Move to CPU before converting to numpy
+            y_true.extend(b_labels)
+            y_pred.extend(preds)
+            texts.extend(b_texts)
+            sent_ids.extend(b_sent_ids)
 
     f1_macro = f1_score(y_true, y_pred, average='macro')
     f1_weighted = f1_score(y_true, y_pred, average='weighted')
     acc = accuracy_score(y_true, y_pred)
+    avg_loss = total_loss / num_batches
 
-    return acc, f1_macro, f1_weighted, y_pred, y_true, texts, sent_ids
+    return acc, f1_macro, f1_weighted, y_pred, y_true, texts, sent_ids, avg_loss
 
 # Evaluate the model on test examples.
 def model_test_eval(dataloader, model, device):
@@ -267,17 +295,18 @@ def train(args):
         train_loss = train_loss / (num_batches)
 
         train_acc, train_f1, train_f1_weighted, *_ = model_eval(train_dataloader, model, device)
-        dev_acc, dev_f1, dev_f1_weighted, *_ = model_eval(dev_dataloader, model, device)
+        dev_acc, dev_f1, dev_f1_weighted, _, _, _, _, dev_loss = model_eval(dev_dataloader, model, device)
+        
 
         # Update metrics tracker
-        metrics_tracker.update(epoch, train_loss, train_acc, train_f1, dev_acc, dev_f1, train_f1_weighted, dev_f1_weighted)
+        metrics_tracker.update(epoch, train_loss, train_acc, train_f1, dev_acc, dev_f1, train_f1_weighted, dev_f1_weighted, dev_loss)
 
         if dev_acc > best_dev_acc or dev_f1 > best_dev_f1:
             best_dev_acc = dev_acc
             best_dev_f1 = dev_f1
             save_model(model, optimizer, args, config, args.filepath)
 
-        print(f"Epoch {epoch}: train loss :: {train_loss :.3f}, train acc :: {train_acc :.3f}, train f1 :: {train_f1 :.3f}, train weighted f1 :: {train_f1_weighted :.3f}, dev acc :: {dev_acc :.3f}, dev f1 :: {dev_f1 :.3f}, dev weighted f1 :: {dev_f1_weighted :.3f}")
+        print(f"Epoch {epoch}: train loss :: {train_loss :.3f}, train acc :: {train_acc :.3f}, train f1 :: {train_f1 :.3f}, train weighted f1 :: {train_f1_weighted :.3f}, dev acc :: {dev_acc :.3f}, dev f1 :: {dev_f1 :.3f}, dev weighted f1 :: {dev_f1_weighted :.3f}, dev loss :: {dev_loss :.3f}")
 
 def test(args):
     with torch.no_grad():
@@ -289,6 +318,9 @@ def test(args):
         model = model.to(device)
         print(f"load model from {args.filepath}")
 
+        # Initialize metrics tracker
+        metrics_tracker = MetricsTracker(args.metrics_dir)
+
         dev_data = load_intent_classification_data(split='validation')
         dev_dataset = IntentClassificationDataset(dev_data, args)
         dev_dataloader = DataLoader(dev_dataset, shuffle=False, batch_size=args.batch_size,
@@ -299,12 +331,15 @@ def test(args):
         test_dataloader = DataLoader(test_dataset, shuffle=False, batch_size=args.batch_size,
                                    collate_fn=test_dataset.collate_fn)
 
-        dev_acc, dev_f1, dev_pred, dev_true, dev_texts, dev_sent_ids = model_eval(dev_dataloader, model, device)
+        # Evaluate on dev set
+        dev_acc, dev_f1, dev_f1_weighted, dev_pred, dev_true, dev_texts, dev_sent_ids, dev_loss = model_eval(dev_dataloader, model, device)
         print('DONE DEV')
 
+        # Evaluate on test set
         test_pred, test_texts, test_sent_ids = model_test_eval(test_dataloader, model, device)
         print('DONE Test')
 
+        # Save predictions
         with open(args.dev_out, "w+") as f:
             print(f"dev acc :: {dev_acc :.3f}")
             f.write(f"id \t Predicted_Intent \n")
