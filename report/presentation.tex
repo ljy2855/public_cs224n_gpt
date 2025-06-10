@@ -1,0 +1,234 @@
+\documentclass{beamer}
+\usepackage[english]{babel}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{xcolor}
+
+% Customize bullet points
+\setbeamertemplate{itemize items}[circle]
+\setbeamertemplate{itemize subitem}[circle]
+
+\title{Fine-tuning GPT-2 for Short Query Intent Classification}
+\author{Jin Young Lee}
+\date{\today}
+
+\begin{document}
+
+% Slide 1: Title
+\begin{frame}
+\titlepage
+\end{frame}
+
+% Slide 2: Motivation and Problem Statement
+\begin{frame}
+\frametitle{Motivation and Problem Statement}
+\begin{columns}
+  \column{0.6\textwidth}
+  \textbf{Problem \& Importance}
+  \begin{itemize}
+    \item Users input short, ambiguous queries
+    \item Predicting intent is key to user experience
+    \item Applicable to voice assistants, chatbots, search engines
+    \item Challenge: minimal context increases ambiguity
+  \end{itemize}
+
+  \column{0.4\textwidth}
+  \textbf{Example Queries}
+  \begin{itemize}
+    \item ``Weather?'' $\rightarrow$ \texttt{weather\_query}
+    \item ``Pizza nearby'' $\rightarrow$ \texttt{find\_restaurant}
+  \end{itemize}
+\end{columns}
+\end{frame}
+
+% Slide 3: Proposed Approach and Methodology
+\begin{frame}
+\frametitle{Proposed Approach and Methodology}
+\begin{columns}
+  \column{0.5\textwidth}
+  \textbf{Model Architecture}
+  \begin{itemize}
+    \item GPT-2 base model (768d hidden)
+    \item Custom classification head
+    \item Two fine-tuning modes:
+    \begin{itemize}
+      \item Last-linear-layer only
+      \item Full-model fine-tuning
+    \end{itemize}
+    \item Dropout (0.3) for regularization
+  \end{itemize}
+
+  \column{0.5\textwidth}
+  \textbf{Training Setup}
+  \begin{itemize}
+    \item Optimizer: AdamW
+    \item Learning rate: 1e-3
+    \item Batch size: 8
+    \item Cross-entropy loss
+    \item Early stopping on dev accuracy
+  \end{itemize}
+\end{columns}
+\end{frame}
+
+% Slide 4: Dataset and Preprocessing
+\begin{frame}
+\frametitle{Dataset and Preprocessing}
+\begin{columns}
+  \column{0.5\textwidth}
+  \textbf{Amazon MASSIVE Dataset}
+  \begin{itemize}
+    \item EN-US subset
+    \item Multiple domains
+    \item Short/long queries
+    \item Labeled intent classes
+  \end{itemize}
+
+  \column{0.5\textwidth}
+  \textbf{Preprocessing Pipeline}
+  \begin{itemize}
+    \item GPT-2 tokenizer
+    \item Dynamic padding
+    \item Truncation to max length
+    \item EOS token as padding
+    \item Unique IDs for tracking
+  \end{itemize}
+\end{columns}
+\end{frame}
+
+% Slide 5: Implementation Details
+\begin{frame}
+\frametitle{Implementation Details}
+\textbf{Model Components}
+\begin{itemize}
+  \item \texttt{GPT2IntentClassifier} class:
+  \begin{itemize}
+    \item GPT-2 backbone with frozen/fine-tuned params
+    \item Linear classification head (768d $\rightarrow$ num\_labels)
+    \item Dropout layer (0.1) before classification
+  \end{itemize}
+  \item Custom dataset classes:
+  \begin{itemize}
+    \item \texttt{IntentClassificationDataset} for train/dev
+    \item \texttt{IntentClassificationTestDataset} for test
+  \end{itemize}
+  \item Evaluation metrics:
+  \begin{itemize}
+    \item Accuracy and Macro F1 score
+    \item Per-class performance analysis
+  \end{itemize}
+\end{itemize}
+\end{frame}
+
+% Slide 6: Training Progress
+\begin{frame}
+\frametitle{Training Progress}
+\begin{columns}
+  \column{0.5\textwidth}
+  \textbf{Loss and Metrics Tracking}
+  \begin{itemize}
+    \item Training loss decreases steadily
+    \item Validation metrics show convergence
+    \item No significant overfitting observed
+    \item Full-model fine-tuning shows better convergence
+  \end{itemize}
+
+  \column{0.5\textwidth}
+  \begin{figure}
+    % \includegraphics[width=\textwidth]{metrics/full-model/metrics_epoch_9.png}
+    \caption{Training metrics over epochs}
+  \end{figure}
+\end{columns}
+\end{frame}
+
+% Slide 7: Experiments and Results
+\begin{frame}
+\frametitle{Experiments and Results}
+\textbf{Quantitative Results}
+\begin{itemize}
+  \item Best performance:
+  \begin{itemize}
+    \item Accuracy: 89.4\%
+    \item Macro F1: 88.2\%
+  \end{itemize}
+  \item Fine-tuning comparison:
+  \begin{itemize}
+    \item Full-model > Last-layer (+3.5 F1)
+    \item Better generalization
+  \end{itemize}
+  \item Performance patterns:
+  \begin{itemize}
+    \item Strong on multi-word queries
+    \item Challenging for single-word inputs
+  \end{itemize}
+\end{itemize}
+\end{frame}
+
+% Slide 8: Challenges and Learnings
+\begin{frame}
+\frametitle{Challenges and Learnings}
+\textbf{Technical Challenges}
+\begin{itemize}
+  \item Model architecture:
+  \begin{itemize}
+    \item Balancing model capacity vs. overfitting
+    \item Optimal dropout rates (0.3 for GPT, 0.1 for head)
+  \end{itemize}
+  \item Training dynamics:
+  \begin{itemize}
+    \item Learning rate sensitivity
+    \item Batch size limitations (GPU memory)
+  \end{itemize}
+  \item Data processing:
+  \begin{itemize}
+    \item Tokenization edge cases
+    \item Padding strategy impact
+  \end{itemize}
+\end{itemize}
+\end{frame}
+
+% Slide 9: Future Work
+\begin{frame}
+\frametitle{Future Work}
+\textbf{Technical Improvements}
+\begin{itemize}
+  \item Model efficiency:
+  \begin{itemize}
+    \item Implement LoRA for efficient fine-tuning
+    \item Explore model quantization
+  \end{itemize}
+  \item Architecture enhancements:
+  \begin{itemize}
+    \item Add attention visualization
+    \item Implement confidence scoring
+  \end{itemize}
+  \item Training improvements:
+  \begin{itemize}
+    \item Learning rate scheduling
+    \item Gradient accumulation
+  \end{itemize}
+\end{itemize}
+\end{frame}
+
+% Slide 10: Q\&A Preparation
+\begin{frame}
+\frametitle{Q\&A Preparation}
+\begin{columns}
+  \column{0.5\textwidth}
+  \textbf{Technical Questions}
+  \begin{itemize}
+    \item Why GPT-2 over BERT?
+    \item Handling of out-of-vocab tokens?
+    \item Memory requirements?
+  \end{itemize}
+
+  \column{0.5\textwidth}
+  \textbf{Implementation Questions}
+  \begin{itemize}
+    \item Training time and resources?
+    \item Deployment considerations?
+    \item Error analysis methodology?
+  \end{itemize}
+\end{columns}
+\end{frame}
+
+\end{document}
