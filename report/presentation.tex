@@ -3,6 +3,9 @@
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta}
+\usepackage{hyperref}
 
 % Customize bullet points
 \setbeamertemplate{itemize items}[circle]
@@ -19,7 +22,17 @@
 \titlepage
 \end{frame}
 
-% Slide 2: Motivation and Problem Statement
+% Slide 2: Search Intent Overview (New Slide)
+\begin{frame}
+\frametitle{Understanding Search Intent}
+\centering
+\begin{figure}
+    \includegraphics[width=0.8\textwidth]{assets/search_intent.png}
+    \caption{Different types of Search Intent}
+\end{figure}
+\end{frame}
+
+% Slide 3: Motivation and Problem Statement
 \begin{frame}
 \frametitle{Motivation and Problem Statement}
 \begin{columns}
@@ -41,85 +54,125 @@
 \end{columns}
 \end{frame}
 
-% Slide 3: Proposed Approach and Methodology
+% Slide 4: Proposed Approach and Methodology
 \begin{frame}
 \frametitle{Proposed Approach and Methodology}
-\begin{columns}
-  \column{0.5\textwidth}
-  \textbf{Model Architecture}
-  \begin{itemize}
-    \item GPT-2 base model (768d hidden)
-    \item Custom classification head
-    \item Two fine-tuning modes:
-    \begin{itemize}
-      \item Last-linear-layer only
-      \item Full-model fine-tuning
-    \end{itemize}
-    \item Dropout (0.3) for regularization
-  \end{itemize}
-
-  \column{0.5\textwidth}
-  \textbf{Training Setup}
-  \begin{itemize}
-    \item Optimizer: AdamW
-    \item Learning rate: 1e-3
-    \item Batch size: 8
-    \item Cross-entropy loss
-    \item Early stopping on dev accuracy
-  \end{itemize}
-\end{columns}
+\centering
+\begin{tabular}{l p{0.6\textwidth}}
+\toprule
+\textbf{Category} & \textbf{Detail} \\
+\midrule
+\textbf{Model} & GPT-2 base model (768d hidden) \\
+\textbf{Classification Head} & Custom linear layer \\
+\textbf{Fine-tuning Modes} & Last-linear-layer, Full-model \\
+\textbf{Regularization} & Dropout (0.3) \\
+\midrule
+\textbf{Optimizer} & AdamW \\
+\textbf{Learning Rate} & 1e-3 \\
+\textbf{Batch Size} & 8 \\
+\textbf{Loss Function} & Cross-entropy \\
+\textbf{Early Stopping} & Based on dev accuracy \\
+\bottomrule
+\end{tabular}
 \end{frame}
 
-% Slide 4: Dataset and Preprocessing
+% New Slide 5: Amazon MASSIVE Dataset Details (Previously part of Slide 5)
 \begin{frame}
-\frametitle{Dataset and Preprocessing}
-\begin{columns}
-  \column{0.5\textwidth}
-  \textbf{Amazon MASSIVE Dataset}
-  \begin{itemize}
-    \item EN-US subset
-    \item Multiple domains
-    \item Short/long queries
-    \item Labeled intent classes
-  \end{itemize}
+  \frametitle{Amazon MASSIVE Dataset (EN-US Subset)}
 
-  \column{0.5\textwidth}
-  \textbf{Preprocessing Pipeline}
-  \begin{itemize}
-    \item GPT-2 tokenizer
-    \item Dynamic padding
-    \item Truncation to max length
-    \item EOS token as padding
-    \item Unique IDs for tracking
-  \end{itemize}
-\end{columns}
+  {\footnotesize \href{https://huggingface.co/datasets/SetFit/amazon_massive_intent_en-US}{[View on Hugging Face]}}
+  \vspace{1em}
+
+  \centering
+  \begin{tabular}{ll}
+  \toprule
+  \textbf{Feature} & \textbf{Description} \\
+  \midrule
+  \textbf{Total Languages} & 51 (Multilingual) \\
+  \textbf{Subset Used} & \texttt{en-US} only \\
+  \textbf{Utterance Count} & $\sim$60,000 utterances (EN-US) \\
+  \textbf{Intent Classes} & 60 distinct intent types \\
+  \textbf{Domains} & Music, Weather, Alarms, Smart Home, etc. \\
+  \textbf{Utterance Length} & Mix of short and long queries \\
+  \textbf{Label Quality} & Human-annotated, high quality \\
+  \textbf{Source} & Amazon Alexa / MASSIVE Dataset \\
+  \bottomrule
+  \end{tabular}
+  
 \end{frame}
 
-% Slide 5: Implementation Details
 \begin{frame}
-\frametitle{Implementation Details}
-\textbf{Model Components}
+  \frametitle{MASSIVE Dataset: EN-US Subset Examples}
+  
+  \vspace{0.5em}
+  \centering
+  \scriptsize
+  \begin{tabular}{cll}
+  \toprule
+  \textbf{ID} & \textbf{Utterance} & \textbf{Intent Label} \\
+  \midrule
+  1   & wake me up at nine am on friday     & alarm\_set \\
+  2   & set an alarm for two hours from now & alarm\_set \\
+  5   & stop                                & audio\_volume\_mute \\
+  9   & make the lighting bit more warm here & iot\_hue\_lightchange \\
+  15  & turn off the light in the bathroom  & iot\_hue\_lightoff \\
+  22  & dim the lights in the kitchen       & iot\_hue\_lightdim \\
+  25  & olly clean the flat                 & iot\_cleaning \\
+  33  & check when the show starts          & calendar\_query \\
+  34  & i want to listen arijit singh song once again & play\_music \\
+  \bottomrule
+  \end{tabular}
+  \vspace{1em}
+  
+  \textit{Intent types include alarms, smart lighting, music playback, and calendar access.}
+  \end{frame}
+
+% New Slide 6: Data Preprocessing Pipeline - Input Example
+\begin{frame}
+\frametitle{Data Preprocessing Pipeline - Input Example}
+\textbf{Preprocessing Steps for GPT-2:}
 \begin{itemize}
-  \item \texttt{GPT2IntentClassifier} class:
-  \begin{itemize}
-    \item GPT-2 backbone with frozen/fine-tuned params
-    \item Linear classification head (768d $\rightarrow$ num\_labels)
-    \item Dropout layer (0.1) before classification
-  \end{itemize}
-  \item Custom dataset classes:
-  \begin{itemize}
-    \item \texttt{IntentClassificationDataset} for train/dev
-    \item \texttt{IntentClassificationTestDataset} for test
-  \end{itemize}
-  \item Evaluation metrics:
-  \begin{itemize}
-    \item Accuracy and Macro F1 score
-    \item Per-class performance analysis
-  \end{itemize}
+  \item Tokenize input using GPT-2 tokenizer (BPE-based)
+  \item Apply dynamic padding within batch
+  \item Truncate to max model input length (e.g., 128)
+  \item Use \texttt{<|endoftext|>} as padding token
+  \item Track unique utterance ID for evaluation alignment
+\end{itemize}
+\vspace{1em}
+\textbf{Example Utterance:}
+\begin{itemize}
+    \item \textbf{Text:} ``play some jazz music''
+    \item \textbf{Intent:} \texttt{music.play\_song}
 \end{itemize}
 \end{frame}
 
-% Slide 6: Training Progress
+% New Slide 7: Data Preprocessing Pipeline - Tokenization
+\begin{frame}
+  \frametitle{Tokenization Flow: From Text to Embeddings}
+  \centering
+  \begin{tikzpicture}[node distance=1.2cm]
+    \node[draw, rectangle] (text) {Raw Utterance};
+    \node[draw, rectangle, below=of text] (tokens) {BPE Tokens};
+    \node[draw, rectangle, below=of tokens] (ids) {Token IDs};
+    \node[draw, rectangle, below=of ids] (mask) {Attention Mask};
+    \node[draw, rectangle, below=of mask] (embed) {Embedding Vectors};
+
+    \draw[-Stealth] (text) -- (tokens);
+    \draw[-Stealth] (tokens) -- (ids);
+    \draw[-Stealth] (ids) -- (mask);
+    \draw[-Stealth] (mask) -- (embed);
+
+    \node[right=1cm of text] {\texttt{play some jazz music}};
+    \node[right=1cm of tokens] {\texttt{["play", " some", " jazz", " music"]}};
+    \node[right=1cm of ids] {\texttt{[1824, 142, 3678, 920]}};
+    \node[right=1cm of mask] {\texttt{[1, 1, 1, 1]}};
+    \node[right=1cm of embed] {\texttt{[4 × 768-d] vectors}};
+ \end{tikzpicture}
+\end{frame}
+
+
+
+% Slide 8: Training Progress (Previously Slide 7)
 \begin{frame}
 \frametitle{Training Progress}
 \begin{columns}
@@ -134,36 +187,61 @@
 
   \column{0.5\textwidth}
   \begin{figure}
-    % \includegraphics[width=\textwidth]{metrics/full-model/metrics_epoch_9.png}
-    \caption{Training metrics over epochs}
+     \includegraphics[width=\textwidth]{last-linear-layer/accuracy_metrics.png}
+     \caption{Example: Accuracy over Epochs}
   \end{figure}
 \end{columns}
 \end{frame}
 
-% Slide 7: Experiments and Results
+% New Slide 8: Training and Dev Loss (Previously Slide 7)
 \begin{frame}
-\frametitle{Experiments and Results}
-\textbf{Quantitative Results}
-\begin{itemize}
-  \item Best performance:
-  \begin{itemize}
-    \item Accuracy: 89.4\%
-    \item Macro F1: 88.2\%
-  \end{itemize}
-  \item Fine-tuning comparison:
-  \begin{itemize}
-    \item Full-model > Last-layer (+3.5 F1)
-    \item Better generalization
-  \end{itemize}
-  \item Performance patterns:
-  \begin{itemize}
-    \item Strong on multi-word queries
-    \item Challenging for single-word inputs
-  \end{itemize}
-\end{itemize}
+\frametitle{Training and Development Loss}
+\centering
+\begin{figure}
+  \includegraphics[width=0.9\textwidth]{last-linear-layer/loss_metrics.png}
+  \caption{Training and Development Loss over Epochs}
+\end{figure}
 \end{frame}
 
-% Slide 8: Challenges and Learnings
+% New Slide 9: Accuracy over Epochs (Previously Slide 8)
+\begin{frame}
+\frametitle{Accuracy over Epochs}
+\centering
+\begin{figure}
+  \includegraphics[width=0.9\textwidth]{last-linear-layer/accuracy_metrics.png}
+  \caption{Accuracy Performance over Epochs (Last-Linear-Layer)}
+\end{figure}
+\end{frame}
+
+% New Slide 10: Fine-tuning Mode Accuracy Comparison (Previously Slide 9)
+\begin{frame}
+\frametitle{Accuracy Comparison: Last-Linear-Layer vs. Full-Model}
+\centering
+\begin{columns}
+  \column{0.48\textwidth}
+  \begin{figure}
+    \includegraphics[width=\textwidth]{last-linear-layer/accuracy_metrics.png}
+    \caption{Last-Linear-Layer Accuracy}
+  \end{figure}
+  \column{0.48\textwidth}
+  \begin{figure}
+    \includegraphics[width=\textwidth]{full-model/accuracy_metrics.png}
+    \caption{Full-Model Accuracy}
+  \end{figure}
+\end{columns}
+\end{frame}
+
+% New Slide 11: F1 Scores over Epochs (Previously Slide 10)
+\begin{frame}
+\frametitle{F1 Scores over Epochs}
+\centering
+\begin{figure}
+  \includegraphics[width=0.9\textwidth]{last-linear-layer/f1_metrics.png}
+  \caption{F1 Score Performance over Epochs}
+\end{figure}
+\end{frame}
+
+% Slide 12: Challenges and Learnings (Previously Slide 11)
 \begin{frame}
 \frametitle{Challenges and Learnings}
 \textbf{Technical Challenges}
@@ -186,7 +264,7 @@
 \end{itemize}
 \end{frame}
 
-% Slide 9: Future Work
+% Slide 13: Future Work (Previously Slide 12)
 \begin{frame}
 \frametitle{Future Work}
 \textbf{Technical Improvements}
@@ -209,26 +287,5 @@
 \end{itemize}
 \end{frame}
 
-% Slide 10: Q\&A Preparation
-\begin{frame}
-\frametitle{Q\&A Preparation}
-\begin{columns}
-  \column{0.5\textwidth}
-  \textbf{Technical Questions}
-  \begin{itemize}
-    \item Why GPT-2 over BERT?
-    \item Handling of out-of-vocab tokens?
-    \item Memory requirements?
-  \end{itemize}
-
-  \column{0.5\textwidth}
-  \textbf{Implementation Questions}
-  \begin{itemize}
-    \item Training time and resources?
-    \item Deployment considerations?
-    \item Error analysis methodology?
-  \end{itemize}
-\end{columns}
-\end{frame}
 
 \end{document}
