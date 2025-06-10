@@ -7,6 +7,9 @@ Trains and evaluates GPT2IntentClassifier on Amazon MASSIVE dataset
 import random, numpy as np, argparse
 from types import SimpleNamespace
 import csv
+import json
+import matplotlib.pyplot as plt
+from pathlib import Path
 
 import torch
 import torch.nn.functional as F
@@ -30,6 +33,80 @@ def seed_everything(seed=11711):
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
+
+class MetricsTracker:
+    def __init__(self, save_dir):
+        self.save_dir = Path(save_dir)
+        try:
+            self.save_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            print(f"Warning: Could not create metrics directory: {e}")
+        self.metrics = {
+            'train_loss': [],
+            'train_acc': [],
+            'train_f1': [],
+            'dev_acc': [],
+            'dev_f1': [],
+            'train_f1_weighted': [],
+            'dev_f1_weighted': []
+        }
+    
+    def update(self, epoch, train_loss, train_acc, train_f1, dev_acc, dev_f1, train_f1_weighted, dev_f1_weighted):
+        self.metrics['train_loss'].append(train_loss)
+        self.metrics['train_acc'].append(train_acc)
+        self.metrics['train_f1'].append(train_f1)
+        self.metrics['dev_acc'].append(dev_acc)
+        self.metrics['dev_f1'].append(dev_f1)
+        self.metrics['train_f1_weighted'].append(train_f1_weighted)
+        self.metrics['dev_f1_weighted'].append(dev_f1_weighted)
+        
+        # Save metrics to JSON
+        try:
+            with open(self.save_dir / 'metrics.json', 'w') as f:
+                json.dump(self.metrics, f, indent=2)
+        except Exception as e:
+            print(f"Warning: Could not save metrics to JSON: {e}")
+        
+        # Plot metrics
+        try:
+            self.plot_metrics()
+        except Exception as e:
+            print(f"Warning: Could not plot metrics: {e}")
+    
+    def plot_metrics(self):
+        plt.figure(figsize=(15, 10))
+        
+        # Create x-axis values (epoch numbers)
+        epochs = list(range(len(self.metrics['train_loss'])))
+        
+        # Plot training loss
+        plt.subplot(2, 1, 1)
+        plt.plot(epochs, self.metrics['train_loss'], label='Training Loss')
+        plt.title('Training Loss over Epochs')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.legend()
+        plt.grid(True)
+        plt.xticks(epochs)  # Show all epoch numbers
+        
+        # Plot accuracy and F1
+        plt.subplot(2, 1, 2)
+        plt.plot(epochs, self.metrics['train_acc'], label='Train Accuracy')
+        plt.plot(epochs, self.metrics['train_f1'], label='Train F1 (Macro)')
+        plt.plot(epochs, self.metrics['dev_acc'], label='Dev Accuracy')
+        plt.plot(epochs, self.metrics['dev_f1'], label='Dev F1 (Macro)')
+        plt.plot(epochs, self.metrics['train_f1_weighted'], label='Train Weighted F1')
+        plt.plot(epochs, self.metrics['dev_f1_weighted'], label='Dev Weighted F1')
+        plt.title('Accuracy and F1 Score over Epochs')
+        plt.xlabel('Epoch')
+        plt.ylabel('Score')
+        plt.legend()
+        plt.grid(True)
+        plt.xticks(epochs)  # Show all epoch numbers
+        
+        plt.tight_layout()
+        plt.savefig(self.save_dir / 'metrics.png')
+        plt.close()
 
 class GPT2IntentClassifier(torch.nn.Module):
     '''
@@ -85,10 +162,11 @@ def model_eval(dataloader, model, device):
         texts.extend(b_texts)
         sent_ids.extend(b_sent_ids)
 
-    f1 = f1_score(y_true, y_pred, average='macro')
+    f1_macro = f1_score(y_true, y_pred, average='macro')
+    f1_weighted = f1_score(y_true, y_pred, average='weighted')
     acc = accuracy_score(y_true, y_pred)
 
-    return acc, f1, y_pred, y_true, texts, sent_ids
+    return acc, f1_macro, f1_weighted, y_pred, y_true, texts, sent_ids
 
 # Evaluate the model on test examples.
 def model_test_eval(dataloader, model, device):
@@ -130,6 +208,9 @@ def save_model(model, optimizer, args, config, filepath):
 def train(args):
     device = torch.device('cuda') if args.use_gpu else torch.device('cpu')
     
+    # Initialize metrics tracker
+    metrics_tracker = MetricsTracker(args.metrics_dir)
+    
     # Load intent classification data
     train_data = load_intent_classification_data(split='train')
     dev_data = load_intent_classification_data(split='validation')
@@ -158,6 +239,7 @@ def train(args):
     lr = args.lr
     optimizer = AdamW(model.parameters(), lr=lr)
     best_dev_acc = 0
+    best_dev_f1 = 0
 
     # Run for the specified number of epochs.
     for epoch in range(args.epochs):
@@ -184,14 +266,18 @@ def train(args):
 
         train_loss = train_loss / (num_batches)
 
-        train_acc, train_f1, *_ = model_eval(train_dataloader, model, device)
-        dev_acc, dev_f1, *_ = model_eval(dev_dataloader, model, device)
+        train_acc, train_f1, train_f1_weighted, *_ = model_eval(train_dataloader, model, device)
+        dev_acc, dev_f1, dev_f1_weighted, *_ = model_eval(dev_dataloader, model, device)
 
-        if dev_acc > best_dev_acc:
+        # Update metrics tracker
+        metrics_tracker.update(epoch, train_loss, train_acc, train_f1, dev_acc, dev_f1, train_f1_weighted, dev_f1_weighted)
+
+        if dev_acc > best_dev_acc or dev_f1 > best_dev_f1:
             best_dev_acc = dev_acc
+            best_dev_f1 = dev_f1
             save_model(model, optimizer, args, config, args.filepath)
 
-        print(f"Epoch {epoch}: train loss :: {train_loss :.3f}, train acc :: {train_acc :.3f}, dev acc :: {dev_acc :.3f}")
+        print(f"Epoch {epoch}: train loss :: {train_loss :.3f}, train acc :: {train_acc :.3f}, train f1 :: {train_f1 :.3f}, train weighted f1 :: {train_f1_weighted :.3f}, dev acc :: {dev_acc :.3f}, dev f1 :: {dev_f1 :.3f}, dev weighted f1 :: {dev_f1_weighted :.3f}")
 
 def test(args):
     with torch.no_grad():
@@ -237,7 +323,9 @@ def get_args():
     parser.add_argument("--fine-tune-mode", type=str,
                       help='last-linear-layer: the GPT parameters are frozen and the task specific head parameters are updated; full-model: GPT parameters are updated as well',
                       choices=('last-linear-layer', 'full-model'), default="last-linear-layer")
-    parser.add_argument("--use_gpu", action='store_true', default=True)
+    parser.add_argument("--use_gpu", action='store_true', default=False)
+    parser.add_argument("--metrics_dir", type=str, default="report",
+                      help="Directory to save training metrics and plots")
 
     parser.add_argument("--batch_size", help='sst: 64, cfimdb: 8 can fit a 12GB GPU', type=int, default=8)
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.3)
@@ -261,7 +349,8 @@ if __name__ == "__main__":
         hidden_dropout_prob=args.hidden_dropout_prob,
         fine_tune_mode=args.fine_tune_mode,
         dev_out='predictions/' + args.fine_tune_mode + '-intent-dev-out.csv',
-        test_out='predictions/' + args.fine_tune_mode + '-intent-test-out.csv'
+        test_out='predictions/' + args.fine_tune_mode + '-intent-test-out.csv',
+        metrics_dir=args.metrics_dir + '/' + args.fine_tune_mode
     )
 
     train(config)
