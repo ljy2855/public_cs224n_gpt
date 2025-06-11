@@ -34,24 +34,18 @@
 
 % Slide 3: Motivation and Problem Statement
 \begin{frame}
-\frametitle{Motivation and Problem Statement}
-\begin{columns}
-  \column{0.6\textwidth}
-  \textbf{Problem \& Importance}
+  \frametitle{Motivation and Problem Statement}
+  \textbf{What is the problem? Why is it important?}
   \begin{itemize}
-    \item Users input short, ambiguous queries
-    \item Predicting intent is key to user experience
-    \item Applicable to voice assistants, chatbots, search engines
-    \item Challenge: minimal context increases ambiguity
+    \item Short queries (\texttt{e.g., "weather?", "pizza nearby"}) are ambiguous
+    \item Misclassified intents degrade user experience
+    \item Accurate intent classification is crucial for:
+    \begin{itemize}
+      \item Voice Assistants
+      \item Search Engines
+    \end{itemize}
+    \item \textbf{Challenge:} Minimal context in short queries
   \end{itemize}
-
-  \column{0.4\textwidth}
-  \textbf{Example Queries}
-  \begin{itemize}
-    \item ``Weather?'' $\rightarrow$ \texttt{weather\_query}
-    \item ``Pizza nearby'' $\rightarrow$ \texttt{find\_restaurant}
-  \end{itemize}
-\end{columns}
 \end{frame}
 
 % Slide 4: Proposed Approach and Methodology
@@ -231,61 +225,78 @@
 \end{columns}
 \end{frame}
 
-% New Slide 11: F1 Scores over Epochs (Previously Slide 10)
 \begin{frame}
-\frametitle{F1 Scores over Epochs}
-\centering
-\begin{figure}
-  \includegraphics[width=0.9\textwidth]{last-linear-layer/f1_metrics.png}
-  \caption{F1 Score Performance over Epochs}
-\end{figure}
+  \frametitle{F1 Score Comparison: Last-Linear-Layer vs. Full-Model}
+  \centering
+  \begin{columns}
+    \column{0.48\textwidth}
+    \begin{figure}
+      \includegraphics[width=\textwidth]{last-linear-layer/f1_metrics.png}
+      \caption{Last-Linear-Layer F1 Scores}
+    \end{figure}
+    \column{0.48\textwidth}
+    \begin{figure}
+      \includegraphics[width=\textwidth]{full-model/f1_metrics.png}
+      \caption{Full-Model F1 Scores}
+    \end{figure}
+  \end{columns}
 \end{frame}
 
-% Slide 12: Challenges and Learnings (Previously Slide 11)
 \begin{frame}
-\frametitle{Challenges and Learnings}
-\textbf{Technical Challenges}
-\begin{itemize}
-  \item Model architecture:
+  \frametitle{Comparison to Official MASSIVE Benchmark (EN-US)}
+  
+  \textbf{Intent Accuracy on EN-US Subset:} \\[0.5em]
+  \href{https://arxiv.org/pdf/2204.08582}{\texttt{FitzGerald et al., 2022 (arXiv:2204.08582)}}
+    
+  \begin{tabular}{lcc}
+    \toprule
+    \textbf{Model} & \textbf{Type} & \textbf{Accuracy (\%)} \\
+    \midrule
+    \textbf{GPT-2} & Decoder-only (monolingual) & \textbf{80.1} \\
+    mT5 Enc Full & Encoder-decoder (multilingual) & 89.0 ± 1.1 \\
+    mT5 T2T Full & Encoder-decoder (multilingual) & 87.9 ± 1.2 \\
+    XLM-R Full & Encoder-only (multilingual) & 88.3 ± 1.2 \\
+    \bottomrule
+  \end{tabular}
+    
+  \vspace{1em}
+  \textbf{Interpretation:}
   \begin{itemize}
-    \item Balancing model capacity vs. overfitting
-    \item Optimal dropout rates (0.3 for GPT, 0.1 for head)
+    \item Our GPT-2 model achieves \textbf{competitive performance} without cross-lingual supervision.
+    \item Models in the paper use \textbf{larger pretraining corpora}, \textbf{multilingual tokens}, and more parameters.
   \end{itemize}
-  \item Training dynamics:
-  \begin{itemize}
-    \item Learning rate sensitivity
-    \item Batch size limitations (GPU memory)
-  \end{itemize}
-  \item Data processing:
-  \begin{itemize}
-    \item Tokenization edge cases
-    \item Padding strategy impact
-  \end{itemize}
-\end{itemize}
+    
+  \textit{→ For an English-only GPT-2 baseline, 80\% accuracy is strong given the task complexity.}
 \end{frame}
 
-% Slide 13: Future Work (Previously Slide 12)
 \begin{frame}
-\frametitle{Future Work}
-\textbf{Technical Improvements}
-\begin{itemize}
-  \item Model efficiency:
+  \frametitle{Ours vs. Original MASSIVE Benchmark}
+  
+  \textbf{Original MASSIVE Benchmark (FitzGerald et al., 2022)} \\[0.5em]
+  \href{https://arxiv.org/pdf/2204.08582}{\texttt{arXiv:2204.08582}}
+  
+  \vspace{0.5em}
   \begin{itemize}
-    \item Implement LoRA for efficient fine-tuning
-    \item Explore model quantization
+    \item mT5 / XLM-R models trained using:
+    \begin{itemize}
+      \item \texttt{p3dn.24xlarge} (8x V100 GPUs) for 3–5 days
+      \item \texttt{g4dn.metal} (8x T4 GPUs) for mT5 Encoder
+      \item Extensive hyperparameter tuning on multilingual data
+    \end{itemize}
   \end{itemize}
-  \item Architecture enhancements:
+  
+  \vspace{1em}
+  \textbf{Our Setup (GPT-2):}
   \begin{itemize}
-    \item Add attention visualization
-    \item Implement confidence scoring
+    \item Single \texttt{RTX 3080} GPU
+    \item Training time: \textbf{~3 hours total}
+    \item No multilingual pretraining or zero-shot setup
   \end{itemize}
-  \item Training improvements:
-  \begin{itemize}
-    \item Learning rate scheduling
-    \item Gradient accumulation
-  \end{itemize}
-\end{itemize}
+  
+  \vspace{1em}
+  \textbf{Conclusion:} Our monolingual GPT-2 model achieves competitive performance with only a fraction of the computational cost.
 \end{frame}
-
 
 \end{document}
+
+
