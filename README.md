@@ -1,7 +1,6 @@
-# CS 224N Default Final Project: Build GPT-2
+# Final Project: Build & Fine-tunning GPT-2
 
-This is the default final project for the Stanford CS 224N class. Please refer to the project handout on the course
-website for detailed instructions and an overview of the codebase.
+This project is part of the Natural Language Processing course (CSE5321, CSEG321) at Sogang University.
 
 ## Project Overview
 
@@ -24,8 +23,7 @@ This project implements and evaluates a GPT-2-based language model across multip
    - Test set: 2,970 utterances
    - Performance: 85.3% accuracy with full-model fine-tuning
 
-[Fine-tuning GPT-2 for Short Query Intent
-Classification](report/report.pdf)
+[Fine-tuning GPT-2 for Short Query Intent Classification](report/report.pdf)
 
 ## Implementation Details
 
