@@ -1,0 +1,10 @@
+cfimdb last : 0.869
+sst last : 0.476
+cfimdb full : 0.882
+sst full :  0.397
+
+---
+model size = gpt2
+
+Paraphrase accuracy : 0.898
+Sonnet CHRF : 41.259
