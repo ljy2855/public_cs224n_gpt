@@ -28,6 +28,9 @@ This project is part of the Natural Language Processing course (CSE5321, CSEG321
   - All experiments conducted on a single NVIDIA RTX 3080 GPU
   - Full-model fine-tuning achieves strong results in under 10 minutes (10 epochs)
 
+
+[Fine-tuning GPT-2 for Short Query Intent Classification](report/report.pdf)
+
 ## Implementation Details
 
 The project comprises two main parts:
