@@ -4,26 +4,29 @@ This project is part of the Natural Language Processing course (CSE5321, CSEG321
 
 ## Project Overview
 
-This project implements and evaluates a GPT-2-based language model across multiple NLP tasks:
+- **Core Implementation:**
+  - 12-layer GPT-2 architecture with masked multi-head self-attention, positional encoding, and residual connections
+  - AdamW optimizer with efficient bias correction and decoupled weight decay
+  - Causal masking for autoregressive decoding
 
-1. **Basic Implementation**
-   - GPT-2 architecture (12-layer, masked multi-head attention)
-   - Adam optimizer with bias correction and decoupled weight decay
+- **Downstream Tasks:**
+  - **Sentiment Analysis** (CFIMDB, SST):
+    - Last-layer: CFIMDB 0.869, SST 0.476
+    - Full-model: CFIMDB 0.882, SST 0.397
+  - **Paraphrase Detection** (Quora Question Pairs):
+    - Full-model accuracy: 0.898
+  - **Sonnet Generation** (Shakespeare Sonnets):
+    - Full-model CHRF: 41.259
 
-2. **Downstream Tasks Performance**
-   - Sentiment Analysis: 97.6% accuracy on CFIMDB (binary)
-   - Paraphrase Detection: 75.2% accuracy on Quora Question Pairs
-   - Sonnet Generation: CHRF score of 0.68 on Shakespeare Sonnets
+- **Main Experiment: Short Query Intent Classification**
+  - Dataset: MASSIVE (SetFit/amazon_massive_intent_en-US), 60 intent labels, 11,500 train / 2,030 val / 2,970 test
+  - Full-model: 85.3% accuracy, 81.2% micro F1 (en-US subset)
+  - Competitive with mT5/XLM-R on the MASSIVE benchmark, despite being monolingual and lightweight
+  - See report for detailed training and validation curves, and F1/accuracy plots
 
-3. **Main Experiment: Short Query Intent Classification**
-   - Dataset: MASSIVE (SetFit/amazon_massive_intent_en-US)
-   - 60 distinct intent labels across 6 domains
-   - Training set: 11,500 utterances
-   - Validation set: 2,030 utterances
-   - Test set: 2,970 utterances
-   - Performance: 85.3% accuracy with full-model fine-tuning
-
-[Fine-tuning GPT-2 for Short Query Intent Classification](report/report.pdf)
+- **Training Efficiency:**
+  - All experiments conducted on a single NVIDIA RTX 3080 GPU
+  - Full-model fine-tuning achieves strong results in under 10 minutes (10 epochs)
 
 ## Implementation Details
 
