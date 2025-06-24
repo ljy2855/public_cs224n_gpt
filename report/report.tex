@@ -227,7 +227,7 @@ Our model achieves competitive performance on the MASSIVE dataset, with detailed
 \end{figure}
 
 \subsubsection{Performance Metrics}
-Figure \ref{fig:accuracy_comparison} presents the model's performance. The full-model fine-tuning approach achieves superior performance compared to last-linear-layer fine-tuning, demonstrating the benefits of allowing the entire model to adapt to the specific task. This improvement suggests that the model can capture more nuanced patterns in user queries when all parameters are updated. Notably, the last-layer model plateaus early, suggesting limited capacity to adapt to diverse linguistic patterns without access to deeper layers.
+Figure \ref{fig:accuracy_comparison_last} presents the model's performance. The full-model fine-tuning approach achieves superior performance compared to last-linear-layer fine-tuning, demonstrating the benefits of allowing the entire model to adapt to the specific task. This improvement suggests that the model can capture more nuanced patterns in user queries when all parameters are updated. Notably, the last-layer model plateaus early, suggesting limited capacity to adapt to diverse linguistic patterns without access to deeper layers.
 
 \subsubsection{Comparison with Official Benchmark}
 When compared to the official MASSIVE benchmark, our full-model fine-tuned GPT-2 achieves competitive results despite using significantly fewer computational resources. Table \ref{tab:benchmark_comparison} shows the comparison with other models from the original paper.
