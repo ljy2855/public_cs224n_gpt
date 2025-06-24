@@ -5,6 +5,7 @@
 \usepackage{booktabs}
 \usepackage{xcolor}
 \usepackage{graphicx}
+\usepackage{amsmath}
 
 \title{Fine-tuning GPT-2 for Short Query Intent Classification}
 
@@ -23,20 +24,72 @@ Recent advancements in natural language processing (NLP) demonstrate the effecti
 
 \section{Basic Implementation Tasks}
 \subsection{GPT-2 Architecture Implementation}
-Our model is based on a 12-layer GPT-2 with masked multi-head attention and feed-forward layers. We implement key components:
+Our implementation of GPT-2 closely follows the original architecture, with all core components built from scratch and verified for compatibility with HuggingFace pretrained weights. The model consists of the following key elements:
+
+\paragraph{Embedding and Positional Encoding}
+Input sentences are first tokenized using byte pair encoding (BPE), mapping each token to a unique integer ID. These IDs are transformed into high-dimensional vectors via a learnable token embedding layer. To encode word order, we add a learnable positional embedding to each token embedding. The sum of token and positional embeddings is then passed through a dropout layer for regularization before entering the transformer blocks.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.85\textwidth]{assets/image.png}
+    \caption{Illustration of the embedding layer: input sentence is tokenized into BPE tokens, which are mapped to token embeddings and combined with position embeddings.}
+    \label{fig:embedding_layer}
+\end{figure}
+
+\paragraph{Transformer Blocks}
+The model stacks 12 identical decoder-style transformer blocks. Each block contains:
 \begin{itemize}
-\item \texttt{CausalSelfAttention} for masked self-attention.
-\item \texttt{GPT2Layer} stacking attention and MLP blocks.
-\item \texttt{GPT2Model} combining token and positional embeddings.
+    \item \textbf{Masked Multi-Head Self-Attention:} This mechanism allows each token to attend to all previous tokens in the sequence, but not future ones, enforced by a causal mask. For each head, input embeddings are projected into queries, keys, and values, and attention scores are computed using scaled dot-product attention. The outputs from all heads are concatenated and linearly projected.
+    \item \textbf{Feed-Forward Network (MLP):} A position-wise two-layer MLP with activation, applied to each token representation.
+    \item \textbf{Layer Normalization and Residual Connections:} Each sub-layer is wrapped with residual connections and layer normalization to stabilize training and improve gradient flow.
 \end{itemize}
+The final output of the last transformer block is normalized by a layer normalization layer.
+
+\paragraph{Causal Masking}
+To preserve the autoregressive property, a causal mask is applied in the attention mechanism, ensuring that each token can only attend to itself and preceding tokens. This is implemented by masking out upper-triangular elements in the attention score matrix, setting them to $-\infty$ before the softmax operation.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.85\textwidth]{assets/Pasted image 20250614182242.png}
+    \caption{Visualization of causal masking in attention: the attention mask prevents each token from attending to future tokens, ensuring autoregressive behavior.}
+    \label{fig:causal_mask}
+\end{figure}
+
+\paragraph{Implementation Details}
+All components, including the attention mechanism, positional encoding, and transformer blocks, were implemented from scratch in PyTorch. The model was validated by loading HuggingFace pretrained weights and passing provided sanity checks.
 
 \subsection{Adam Optimizer Implementation}
-We implement the Adam optimizer with bias correction and decoupled weight decay. The optimizer includes:
-\begin{itemize}
-\item Momentum terms for first and second moments
-\item Bias correction for initial training steps
-\item Weight decay decoupling for better regularization
-\end{itemize}
+We implemented the AdamW optimizer from first principles to enable stable and efficient training of our GPT-2 model. AdamW is an extension of the Adam optimizer that decouples weight decay from the gradient-based parameter update, improving regularization and generalization, especially in large-scale language models.
+
+\paragraph{Algorithm Overview}
+AdamW maintains exponential moving averages of both the gradients (first moment, $m_t$) and the squared gradients (second moment, $v_t$) for each parameter. At each step $t$, the optimizer performs the following updates:
+\begin{align*}
+    m_t &= \beta_1 m_{t-1} + (1 - \beta_1) g_t \\
+    v_t &= \beta_2 v_{t-1} + (1 - \beta_2) g_t^2 \\
+    \hat{m}_t &= m_t / (1 - \beta_1^t) \\
+    \hat{v}_t &= v_t / (1 - \beta_2^t)
+\end{align*}
+where $g_t$ is the gradient at step $t$, and $\beta_1, \beta_2$ are decay rates for the moment estimates.
+
+The parameter update uses the bias-corrected moments:
+\begin{align*}
+    \theta_t = \theta_{t-1} - \alpha \frac{\hat{m}_t}{\sqrt{\hat{v}_t} + \epsilon}
+\end{align*}
+where $\alpha$ is the learning rate and $\epsilon$ is a small constant for numerical stability.
+
+\paragraph{Decoupled Weight Decay}
+Unlike the original Adam, which incorporates weight decay into the gradient, AdamW applies weight decay directly to the parameters after the main update:
+\begin{align*}
+    \theta_t \leftarrow \theta_t - \alpha \cdot \lambda \cdot \theta_t
+\end{align*}
+where $\lambda$ is the weight decay coefficient. This decoupling leads to more effective regularization and prevents undesirable interactions between weight decay and adaptive learning rates.
+
+\paragraph{Efficient Bias Correction}
+Our implementation uses the efficient bias correction method described in the Adam paper, combining the learning rate and bias correction factors into a single step size for computational efficiency:
+\begin{align*}
+    \text{step\_size} &= \alpha \cdot \frac{\sqrt{1 - \beta_2^t}}{1 - \beta_1^t} \\
+    \theta_t &= \theta_{t-1} - \text{step\_size} \cdot \frac{m_t}{\sqrt{v_t} + \epsilon}
+\end{align*}
 
 \section{Basic Downstream Tasks}
 We evaluate our GPT-2 implementation on three fundamental NLP tasks to validate the model's capabilities. Table \ref{tab:downstream_results} summarizes the performance across these tasks.
